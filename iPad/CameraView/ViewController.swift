@@ -15,6 +15,8 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
     var device: AVCaptureDevice?
     var session: AVCaptureSession?
     let imageView = UIImageView(frame: .zero)
+    
+    var buffer: [CUnsignedChar]?
 
     public override func viewDidLoad() {
         super.viewDidLoad()
@@ -64,6 +66,18 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
     }
     
     public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        
+        switch connection.videoOrientation {
+        case .portrait:
+            print("portrait")
+        case .portraitUpsideDown:
+            print("portraitUpsideDown")
+        case .landscapeLeft:
+            print("landscapeLeft")
+        case .landscapeRight:
+            print("landscapeRight")
+        }
+        
         NSLog("[Camera] - capture")
         let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)!
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
@@ -73,6 +87,21 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         //CIImageからCGImageを作成
         let pixelBufferWidth = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
         let pixelBufferHeight = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
+        
+        let pointer = CVPixelBufferGetBaseAddress(pixelBuffer)
+        
+        if buffer == nil {
+            let height = CVPixelBufferGetHeight(pixelBuffer)
+            let bytesPerHeight = CVPixelBufferGetBytesPerRow(pixelBuffer)
+            buffer = [CUnsignedChar](repeating: 0, count: height * bytesPerHeight)
+        }
+        
+        if var temp = buffer {
+            let height = CVPixelBufferGetHeight(pixelBuffer)
+            let bytesPerHeight = CVPixelBufferGetBytesPerRow(pixelBuffer)
+            memcpy(&temp, pointer, height * bytesPerHeight)
+        }
+        
         let imageRect:CGRect = CGRect(x: 0, y: 0, width: pixelBufferWidth, height: pixelBufferHeight)
         let context = CIContext()
         let cgImage = context.createCGImage(image, from: imageRect)
