@@ -2,8 +2,8 @@
 import PlaygroundSupport
 
 public class CameraPlayground {
+    public static let viewController = ViewController()
     public static func initialize() {
-        let s = ViewController()
-        PlaygroundPage.current.liveView = s
+        PlaygroundPage.current.liveView = viewController
     }
 }

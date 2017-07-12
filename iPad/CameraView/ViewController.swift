@@ -16,8 +16,17 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
     var session: AVCaptureSession?
     let imageView = UIImageView(frame: .zero)
     
-    var buffer: [CUnsignedChar]?
-
+    var imageFunc: ((inout [CUnsignedChar], Int, Int, Int) -> Void) = { (pixel: inout [CUnsignedChar], width: Int, height: Int, bytesPerRow: Int) -> Void in
+        for y in 0..<height {
+            for x in 0..<width {
+                pixel[4 * x + y * bytesPerRow + 0] = 0
+                //                buffer[4 * x + y * bytesPerRow + 1] = 0
+                //                buffer[4 * x + y * bytesPerRow + 2] = 255
+                //                buffer[4 * x + y * bytesPerRow + 3] = 255
+            }
+        }
+    }
+    
     public override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -37,7 +46,7 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         do {
             let deviceInput = try AVCaptureDeviceInput(device: device)
             session.addInput(deviceInput)
-            session.sessionPreset = .vga640x480
+            session.sessionPreset = .low
         } catch {
             print(error)
             return
@@ -65,12 +74,11 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         self.device = device
     }
     
-    private func creatCGImage(pixels: [CUnsignedChar], width: CGFloat, height: CGFloat, bytesPerPixel: CGFloat) -> CGImage? {
-        guard var buffer = buffer else { return nil }
+    private func creatCGImage(pointer: UnsafeMutableRawPointer?, width: CGFloat, height: CGFloat, bytesPerPixel: CGFloat) -> CGImage? {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue)
             .union(CGBitmapInfo.byteOrder32Little)
-        guard let context = CGContext(data: &buffer, width: Int(width), height: Int(height), bitsPerComponent: 8, bytesPerRow: Int(bytesPerPixel), space: colorSpace, bitmapInfo: bitmapInfo.rawValue) else { return nil }
+        guard let context = CGContext(data: pointer, width: Int(width), height: Int(height), bitsPerComponent: 8, bytesPerRow: Int(bytesPerPixel), space: colorSpace, bitmapInfo: bitmapInfo.rawValue) else { return nil }
         return context.makeImage()
     }
     
@@ -91,40 +99,24 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)!
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
 
-//        let image = CIImage(cvImageBuffer: pixelBuffer)
-
         let pixelBufferWidth = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
         let pixelBufferHeight = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
         let bytesPerHeight = CGFloat(CVPixelBufferGetBytesPerRow(pixelBuffer))
-        
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+
         let pointer = CVPixelBufferGetBaseAddress(pixelBuffer)
         
-        if buffer == nil {
-            let height = CVPixelBufferGetHeight(pixelBuffer)
-            let bytesPerHeight = CVPixelBufferGetBytesPerRow(pixelBuffer)
-            buffer = [CUnsignedChar](repeating: 0, count: height * bytesPerHeight)
-        }
+        var buffer: [CUnsignedChar] = [CUnsignedChar](repeating: 0, count: height * bytesPerRow)
+
+        memcpy(&buffer, pointer, height * bytesPerRow)
+
+        imageFunc(&buffer, width, height, bytesPerRow)
         
-        if var temp = buffer {
-            let height = CVPixelBufferGetHeight(pixelBuffer)
-            let bytesPerHeight = CVPixelBufferGetBytesPerRow(pixelBuffer)
-            memcpy(&temp, pointer, height * bytesPerHeight)
-            
-            for i in 0..<10000 {
-                temp[i] = 122
-            }
-        }
-        
-        guard let cgImage = creatCGImage(pixels: buffer!, width: pixelBufferWidth, height: pixelBufferHeight, bytesPerPixel: bytesPerHeight) else { return }
-        
-//
-//        let imageRect:CGRect = CGRect(x: 0, y: 0, width: pixelBufferWidth, height: pixelBufferHeight)
-//        let context = CIContext()
-//        let cgImage = context.createCGImage(image, from: imageRect)
-//
+        guard let cgImage = creatCGImage(pointer: &buffer, width: pixelBufferWidth, height: pixelBufferHeight, bytesPerPixel: bytesPerHeight) else { return }
 
         let uiImage = UIImage(cgImage: cgImage)
-        print(uiImage)
         CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
 
         DispatchQueue.main.async {
