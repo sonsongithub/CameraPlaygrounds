@@ -11,39 +11,45 @@ import UIKit
 import AVFoundation
 import CoreImage
 
+enum CameraOrientation {
+    case landscapeLeft
+    case landscapeRight
+    case portrait
+    case portraitUpsideDown
+}
+
 public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBufferDelegate {
     var device: AVCaptureDevice?
     var session: AVCaptureSession?
-    var connection: AVCaptureConnection?
     let imageView = UIImageView(frame: .zero)
+    
+    var cameraOrientation = CameraOrientation.landscapeLeft
+    
+    var ratio = CGFloat(1)
     
     var orientation = AVCaptureVideoOrientation.portrait
 
     var pixelBuffer24bit: [CUnsignedChar]?
     var pixelBuffer32bit: [CUnsignedChar]?
     
+    var constraintWidth: NSLayoutConstraint?
+    var constraintHeight: NSLayoutConstraint?
+    
+    var outputWidth = 1
+    var outputHeight = 1
+    
+    var originalVideoWidth = 1
+    var originalVideoHeight = 1
+    
     var imageFunc: ((inout [CUnsignedChar], Int, Int, Int) -> Void) = { (pixel: inout [CUnsignedChar], width: Int, height: Int, bytesPerRow: Int) -> Void in
         
-//        var temp: [CUnsignedChar] = [CUnsignedChar](repeating: 0, count: height * bytesPerRow)
-//
-//        memcpy(&temp, &pixel, height * bytesPerRow)
-        
-//        for y in 0..<height {
-//            for x in 0..<width {
-//
-//                let targetx = x //width - 1 - x
-//                let targety = height - 1 - y
-//
-//                let r = CUnsignedChar(20) //pixel[4 * x + y * bytesPerRow + 0]
-//                let g = temp[4 * x + y * bytesPerRow + 1]
-//                let b = temp[4 * x + y * bytesPerRow + 2]
-//                let a = temp[4 * x + y * bytesPerRow + 3]
-//                pixel[4 * targetx + targety * bytesPerRow + 0] = r
+        for y in 0..<height {
+            for x in 0..<width/2 {
+                pixel[3 * x + y * bytesPerRow + 0] = 0
 //                pixel[4 * targetx + targety * bytesPerRow + 1] = g
 //                pixel[4 * targetx + targety * bytesPerRow + 2] = b
-//                pixel[4 * targetx + targety * bytesPerRow + 3] = a
-//            }
-//        }
+            }
+        }
     }
     
     public override func viewDidLoad() {
@@ -52,8 +58,21 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         self.view.addSubview(imageView)
         imageView.translatesAutoresizingMaskIntoConstraints = false
         let views: [String: UIView] = ["imageView": imageView]
-        self.view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "H:|-0-[imageView]-0-|", options: [], metrics: nil, views: views))
-        self.view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "V:|-0-[imageView]-0-|", options: [], metrics: nil, views: views))
+//        self.view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "H:|-0-[imageView]-0-|", options: [], metrics: nil, views: views))
+//        self.view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "V:|-0-[imageView]-0-|", options: [], metrics: nil, views: views))
+        
+        let constraintX = NSLayoutConstraint(item: self.view, attribute: .centerX, relatedBy: .equal, toItem: imageView, attribute: .centerX, multiplier: 1, constant: 0)
+        let constraintY = NSLayoutConstraint(item: self.view, attribute: .centerY, relatedBy: .equal, toItem: imageView, attribute: .centerY, multiplier: 1, constant: 0)
+        let constraintWidth = NSLayoutConstraint(item: imageView, attribute: .width, relatedBy: .equal, toItem: nil, attribute: .notAnAttribute, multiplier: 1, constant: 384)
+        let constraintHeight = NSLayoutConstraint(item: imageView, attribute: .height, relatedBy: .equal, toItem: nil, attribute: .notAnAttribute, multiplier: 1, constant: 384)
+        
+        self.view.addConstraint(constraintX)
+        self.view.addConstraint(constraintY)
+        imageView.addConstraint(constraintWidth)
+        imageView.addConstraint(constraintHeight)
+        
+        self.constraintWidth = constraintWidth
+        self.constraintHeight = constraintHeight
         
         let session = AVCaptureSession()
         let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: .front)
@@ -65,7 +84,7 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         do {
             let deviceInput = try AVCaptureDeviceInput(device: device)
             session.addInput(deviceInput)
-            session.sessionPreset = .low
+            session.sessionPreset = .medium
         } catch {
             print(error)
             return
@@ -77,8 +96,6 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         output.setSampleBufferDelegate(self, queue: cameraQueue)
         output.alwaysDiscardsLateVideoFrames = true
         session.addOutput(output)
-        
-        self.connection = output.connection(with: .video)
         
         session.commitConfiguration()
 
@@ -103,67 +120,29 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         return context.makeImage()
     }
     
+    public override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+    }
+    
     public override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
-        session?.stopRunning()
-        session?.beginConfiguration()
-        print(UIApplication.shared.statusBarOrientation.rawValue)
-        switch UIApplication.shared.statusBarOrientation {
-        case .landscapeLeft:
-            self.connection?.videoOrientation = .landscapeLeft
-        case .landscapeRight:
-            self.connection?.videoOrientation = .landscapeRight
-        case .portrait:
-            self.connection?.videoOrientation = .portrait
-        case .portraitUpsideDown:
-            self.connection?.videoOrientation = .portraitUpsideDown
-        case .unknown:
-            self.connection?.videoOrientation = .portrait
-        }
-        session?.commitConfiguration()
-        session?.startRunning()
     }
     
     public func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-//        print(connection)
-//        DispatchQueue.main.async {
-//            print(UIApplication.shared.statusBarOrientation.rawValue)
-//        }
-//        if orientation != connection.videoOrientation {
-//            switch connection.videoOrientation {
-//            case .portrait:
-//                print("portrait")
-//            case .portraitUpsideDown:
-//                print("portraitUpsideDown")
-//            case .landscapeLeft:
-//                print("landscapeLeft")
-//            case .landscapeRight:
-//                print("landscapeRight")
-//            }
-//            orientation = connection.videoOrientation
-//        }
-        
-        connection.videoOrientation = .portrait
-//
-//        NSLog("[Camera] - capture")
         let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)!
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
 
-        let pixelBufferWidth = CGFloat(CVPixelBufferGetWidth(pixelBuffer))
-        let pixelBufferHeight = CGFloat(CVPixelBufferGetHeight(pixelBuffer))
-        let bytesPerHeight = CGFloat(CVPixelBufferGetBytesPerRow(pixelBuffer))
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
         let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
         
-        print("\(width)x\(height)")
-
+        originalVideoWidth = width
+        originalVideoHeight = height
+        
         guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
         
         let pointer: UnsafeMutablePointer<UInt8> = baseAddress.assumingMemoryBound(to: UInt8.self)
         
-//        var buffer: [CUnsignedChar] = [CUnsignedChar](repeating: 0, count: height * width * 3)
-
         if pixelBuffer24bit == nil {
             pixelBuffer24bit = [CUnsignedChar](repeating: 0, count: height * width * 3)
         }
@@ -171,50 +150,178 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
             pixelBuffer32bit = [CUnsignedChar](repeating: 0, count: height * width * 4)
         }
         
-        for y in 0..<height {
-            for x in 0..<width {
+        switch UIDevice.current.orientation {
+        case .landscapeRight:
+            let newOrientation = CameraOrientation.landscapeRight
+            if newOrientation != cameraOrientation {
+                cameraOrientation = .landscapeRight
+                outputWidth = height
+                outputHeight = width
+                
+                DispatchQueue.main.async {
+                    let A = self.view.frame.size.width / self.view.frame.size.height
+                    let a = CGFloat(self.outputWidth) / CGFloat(self.outputHeight)
 
-                let targetx = x //width - 1 - x
-                let targety = y //height - 1 - y
-
-                let r = pointer[4 * x + y * bytesPerRow + 0]
-                let g = pointer[4 * x + y * bytesPerRow + 1]
-                let b = pointer[4 * x + y * bytesPerRow + 2]
-//                let a = pointer[4 * x + y * bytesPerRow + 3]
-                pixelBuffer24bit![3 * targetx + targety * width * 3 + 0] = r
-                pixelBuffer24bit![3 * targetx + targety * width * 3 + 1] = g
-                pixelBuffer24bit![3 * targetx + targety * width * 3 + 2] = b
+                    if A < a {
+                        self.constraintHeight?.constant = self.view.frame.size.height
+                        self.constraintWidth?.constant = self.view.frame.size.height * a
+                    } else {
+                        self.constraintWidth?.constant = self.view.frame.size.width
+                        self.constraintHeight?.constant = self.view.frame.size.width / a
+                    }
+                }
             }
+        case .landscapeLeft:
+            let newOrientation = CameraOrientation.landscapeLeft
+            if newOrientation != cameraOrientation {
+                cameraOrientation = .landscapeLeft
+                outputWidth = height
+                outputHeight = width
+                
+                DispatchQueue.main.async {
+                    let A = self.view.frame.size.width / self.view.frame.size.height
+                    let a = CGFloat(self.outputWidth) / CGFloat(self.outputHeight)
+                    
+                    if A < a {
+                        self.constraintHeight?.constant = self.view.frame.size.height
+                        self.constraintWidth?.constant = self.view.frame.size.height * a
+                    } else {
+                        self.constraintWidth?.constant = self.view.frame.size.width
+                        self.constraintHeight?.constant = self.view.frame.size.width / a
+                    }
+                }
+            }
+        case .portrait:
+            let newOrientation = CameraOrientation.portrait
+            if newOrientation != cameraOrientation {
+                cameraOrientation = .portrait
+                outputWidth = width
+                outputHeight = height
+                
+                DispatchQueue.main.async {
+                    let A = self.view.frame.size.width / self.view.frame.size.height
+                    let a = CGFloat(self.outputWidth) / CGFloat(self.outputHeight)
+                    
+                    if A < a {
+                        self.constraintHeight?.constant = self.view.frame.size.height
+                        self.constraintWidth?.constant = self.view.frame.size.height * a
+                    } else {
+                        self.constraintWidth?.constant = self.view.frame.size.width
+                        self.constraintHeight?.constant = self.view.frame.size.width / a
+                    }
+                }
+            }
+        case .portraitUpsideDown:
+            let newOrientation = CameraOrientation.portraitUpsideDown
+            if newOrientation != cameraOrientation {
+                cameraOrientation = .portraitUpsideDown
+                outputWidth = width
+                outputHeight = height
+                
+                DispatchQueue.main.async {
+                    let A = self.view.frame.size.width / self.view.frame.size.height
+                    let a = CGFloat(self.outputWidth) / CGFloat(self.outputHeight)
+                    
+                    if A < a {
+                        self.constraintHeight?.constant = self.view.frame.size.height
+                        self.constraintWidth?.constant = self.view.frame.size.height * a
+                    } else {
+                        self.constraintWidth?.constant = self.view.frame.size.width
+                        self.constraintHeight?.constant = self.view.frame.size.width / a
+                    }
+                }
+            }
+        default:
+            do {}
         }
-
-//        memcpy(&buffer, pointer, height * bytesPerRow)
-
-        imageFunc(&pixelBuffer24bit!, width, height, 3 * width)
         
-        for y in 0..<height {
-            for x in 0..<width {
-                
-                let targetx = x //width - 1 - x
-                let targety = height - 1 - y
-                
-                let r = pixelBuffer24bit![3 * x + y * width * 3 + 0]
-                let g = pixelBuffer24bit![3 * x + y * width * 3 + 1]
-                let b = pixelBuffer24bit![3 * x + y * width * 3 + 2]
-                pixelBuffer32bit![4 * targetx + targety * width * 4 + 0] = 255
-                pixelBuffer32bit![4 * targetx + targety * width * 4 + 1] = r
-                pixelBuffer32bit![4 * targetx + targety * width * 4 + 2] = g
-                pixelBuffer32bit![4 * targetx + targety * width * 4 + 3] = b
+        switch cameraOrientation {
+        case .landscapeLeft:
+            outputWidth = height
+            outputHeight = width
+            for y in 0..<height {
+                for x in 0..<width {
+                    let targetx = y
+                    let targety = x
+                    let r = pointer[4 * x + y * bytesPerRow + 0]
+                    let g = pointer[4 * x + y * bytesPerRow + 1]
+                    let b = pointer[4 * x + y * bytesPerRow + 2]
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 0] = r
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 1] = g
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
+                }
+            }
+        case .landscapeRight:
+            outputWidth = height
+            outputHeight = width
+            for y in 0..<height {
+                for x in 0..<width {
+                    let targetx = y
+                    let targety = outputHeight - 1 - x
+                    let r = pointer[4 * x + y * bytesPerRow + 0]
+                    let g = pointer[4 * x + y * bytesPerRow + 1]
+                    let b = pointer[4 * x + y * bytesPerRow + 2]
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 0] = r
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 1] = g
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
+                }
+            }
+        case .portrait:
+            outputWidth = width
+            outputHeight = height
+            for y in 0..<height {
+                for x in 0..<width {
+                    let targetx = x
+                    let targety = y
+                    let r = pointer[4 * x + y * bytesPerRow + 0]
+                    let g = pointer[4 * x + y * bytesPerRow + 1]
+                    let b = pointer[4 * x + y * bytesPerRow + 2]
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 0] = r
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 1] = g
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
+                }
+            }
+        case .portraitUpsideDown:
+            outputWidth = width
+            outputHeight = height
+            for y in 0..<height {
+                for x in 0..<width {
+                    let targetx = x
+                    let targety = outputHeight - 1 - y
+                    let r = pointer[4 * x + y * bytesPerRow + 0]
+                    let g = pointer[4 * x + y * bytesPerRow + 1]
+                    let b = pointer[4 * x + y * bytesPerRow + 2]
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 0] = r
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 1] = g
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
+                }
             }
         }
+        
+        ratio = CGFloat(outputWidth) / CGFloat(outputHeight)
 
-        guard let cgImage = creatCGImage(pointer: &pixelBuffer32bit!, width: width, height: height, bytesPerPixel: width * 4) else { return }
+        imageFunc(&pixelBuffer24bit!, outputWidth, outputHeight, 3 * outputWidth)
+        
+        for y in 0..<outputHeight {
+            for x in 0..<outputWidth {
+                let r = pixelBuffer24bit![3 * x + y * outputWidth * 3 + 0]
+                let g = pixelBuffer24bit![3 * x + y * outputWidth * 3 + 1]
+                let b = pixelBuffer24bit![3 * x + y * outputWidth * 3 + 2]
+                pixelBuffer32bit![4 * x + y * outputWidth * 4 + 0] = 255
+                pixelBuffer32bit![4 * x + y * outputWidth * 4 + 1] = r
+                pixelBuffer32bit![4 * x + y * outputWidth * 4 + 2] = g
+                pixelBuffer32bit![4 * x + y * outputWidth * 4 + 3] = b
+            }
+        }
+        CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+
+        guard let cgImage = creatCGImage(pointer: &pixelBuffer32bit!, width: outputWidth, height: outputHeight, bytesPerPixel: outputWidth * 4) else { return }
 
         let uiImage = UIImage(cgImage: cgImage)
 
         DispatchQueue.main.async {
             self.imageView.image = uiImage
         }
-        CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
     }
 }
 
