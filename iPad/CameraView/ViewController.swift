@@ -41,7 +41,7 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
     var originalVideoWidth = 1
     var originalVideoHeight = 1
     
-    var imageFunc: ((inout [CUnsignedChar], Int, Int, Int) -> Void) = { (pixel: inout [CUnsignedChar], width: Int, height: Int, bytesPerRow: Int) -> Void in
+    public var imageFunc: ((inout [CUnsignedChar], Int, Int, Int) -> Void) = { (pixel: inout [CUnsignedChar], width: Int, height: Int, bytesPerRow: Int) -> Void in
         
         for y in 0..<height {
             for x in 0..<width/2 {
@@ -57,7 +57,7 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         
         self.view.addSubview(imageView)
         imageView.translatesAutoresizingMaskIntoConstraints = false
-        let views: [String: UIView] = ["imageView": imageView]
+//        let views: [String: UIView] = ["imageView": imageView]
 //        self.view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "H:|-0-[imageView]-0-|", options: [], metrics: nil, views: views))
 //        self.view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "V:|-0-[imageView]-0-|", options: [], metrics: nil, views: views))
         
@@ -84,7 +84,7 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         do {
             let deviceInput = try AVCaptureDeviceInput(device: device)
             session.addInput(deviceInput)
-            session.sessionPreset = .medium
+            session.sessionPreset = .low
         } catch {
             print(error)
             return
