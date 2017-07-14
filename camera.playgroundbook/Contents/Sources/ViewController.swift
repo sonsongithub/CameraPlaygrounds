@@ -6,6 +6,7 @@
 //  Copyright © 2017年 sonson. All rights reserved.
 //
 
+
 import UIKit
 import AVFoundation
 import CoreImage
@@ -149,19 +150,20 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
             pixelBuffer32bit = [CUnsignedChar](repeating: 0, count: height * width * 4)
         }
 
-        switch UIDevice.current.orientation {
+        switch self.interfaceOrientation {
         case .landscapeRight:
             let newOrientation = CameraOrientation.landscapeRight
             if newOrientation != cameraOrientation {
+                print("landscapeRight")
                 cameraOrientation = .landscapeRight
-                outputWidth = height
-                outputHeight = width
+                outputWidth = width
+                outputHeight = height
 
                 DispatchQueue.main.async {
                     let A = self.view.frame.size.width / self.view.frame.size.height
                     let a = CGFloat(self.outputWidth) / CGFloat(self.outputHeight)
 
-                    if A < a {
+                    if A > a {
                         self.constraintHeight?.constant = self.view.frame.size.height
                         self.constraintWidth?.constant = self.view.frame.size.height * a
                     } else {
@@ -173,15 +175,16 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         case .landscapeLeft:
             let newOrientation = CameraOrientation.landscapeLeft
             if newOrientation != cameraOrientation {
+                print("landscapeLeft")
                 cameraOrientation = .landscapeLeft
-                outputWidth = height
-                outputHeight = width
+                outputWidth = width
+                outputHeight = height
 
                 DispatchQueue.main.async {
                     let A = self.view.frame.size.width / self.view.frame.size.height
                     let a = CGFloat(self.outputWidth) / CGFloat(self.outputHeight)
 
-                    if A < a {
+                    if A > a {
                         self.constraintHeight?.constant = self.view.frame.size.height
                         self.constraintWidth?.constant = self.view.frame.size.height * a
                     } else {
@@ -193,15 +196,16 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         case .portrait:
             let newOrientation = CameraOrientation.portrait
             if newOrientation != cameraOrientation {
+                print("portrait")
                 cameraOrientation = .portrait
-                outputWidth = width
-                outputHeight = height
+                outputWidth = height
+                outputHeight = width
 
                 DispatchQueue.main.async {
                     let A = self.view.frame.size.width / self.view.frame.size.height
                     let a = CGFloat(self.outputWidth) / CGFloat(self.outputHeight)
 
-                    if A < a {
+                    if A > a {
                         self.constraintHeight?.constant = self.view.frame.size.height
                         self.constraintWidth?.constant = self.view.frame.size.height * a
                     } else {
@@ -213,15 +217,16 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
         case .portraitUpsideDown:
             let newOrientation = CameraOrientation.portraitUpsideDown
             if newOrientation != cameraOrientation {
+                print("portraitUpsideDown")
                 cameraOrientation = .portraitUpsideDown
-                outputWidth = width
-                outputHeight = height
+                outputWidth = height
+                outputHeight = width
 
                 DispatchQueue.main.async {
                     let A = self.view.frame.size.width / self.view.frame.size.height
                     let a = CGFloat(self.outputWidth) / CGFloat(self.outputHeight)
 
-                    if A < a {
+                    if A > a {
                         self.constraintHeight?.constant = self.view.frame.size.height
                         self.constraintWidth?.constant = self.view.frame.size.height * a
                     } else {
@@ -236,36 +241,6 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
 
         switch cameraOrientation {
         case .landscapeLeft:
-            outputWidth = height
-            outputHeight = width
-            for y in 0..<height {
-                for x in 0..<width {
-                    let targetx = y
-                    let targety = x
-                    let r = pointer[4 * x + y * bytesPerRow + 0]
-                    let g = pointer[4 * x + y * bytesPerRow + 1]
-                    let b = pointer[4 * x + y * bytesPerRow + 2]
-                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 0] = r
-                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 1] = g
-                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
-                }
-            }
-        case .landscapeRight:
-            outputWidth = height
-            outputHeight = width
-            for y in 0..<height {
-                for x in 0..<width {
-                    let targetx = y
-                    let targety = outputHeight - 1 - x
-                    let r = pointer[4 * x + y * bytesPerRow + 0]
-                    let g = pointer[4 * x + y * bytesPerRow + 1]
-                    let b = pointer[4 * x + y * bytesPerRow + 2]
-                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 0] = r
-                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 1] = g
-                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
-                }
-            }
-        case .portrait:
             outputWidth = width
             outputHeight = height
             for y in 0..<height {
@@ -280,13 +255,43 @@ public class ViewController: UIViewController, AVCaptureVideoDataOutputSampleBuf
                     pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
                 }
             }
-        case .portraitUpsideDown:
+        case .landscapeRight:
             outputWidth = width
             outputHeight = height
             for y in 0..<height {
                 for x in 0..<width {
                     let targetx = x
-                    let targety = outputHeight - 1 - y
+                    let targety = height - 1 - y
+                    let r = pointer[4 * x + y * bytesPerRow + 0]
+                    let g = pointer[4 * x + y * bytesPerRow + 1]
+                    let b = pointer[4 * x + y * bytesPerRow + 2]
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 0] = r
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 1] = g
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
+                }
+            }
+        case .portrait:
+            outputWidth = height
+            outputHeight = width
+            for y in 0..<height {
+                for x in 0..<width {
+                    let targetx = y
+                    let targety = x
+                    let r = pointer[4 * x + y * bytesPerRow + 0]
+                    let g = pointer[4 * x + y * bytesPerRow + 1]
+                    let b = pointer[4 * x + y * bytesPerRow + 2]
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 0] = r
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 1] = g
+                    pixelBuffer24bit![3 * targetx + targety * outputWidth * 3 + 2] = b
+                }
+            }
+        case .portraitUpsideDown:
+            outputWidth = height
+            outputHeight = width
+            for y in 0..<height {
+                for x in 0..<width {
+                    let targetx = y
+                    let targety = width - 1 - x
                     let r = pointer[4 * x + y * bytesPerRow + 0]
                     let g = pointer[4 * x + y * bytesPerRow + 1]
                     let b = pointer[4 * x + y * bytesPerRow + 2]
